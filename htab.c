@@ -23,16 +23,14 @@ htabkey(struct hashtablekey *k, const char *s, size_t n)
 struct hashtable *
 mkhtab(size_t cap)
 {
-	struct hashtable *h;
-	size_t i;
-
 	assert(!(cap & (cap - 1)));
-	h = xmalloc(sizeof(*h));
+
+	struct hashtable *h = xmalloc(sizeof(*h));
 	h->len = 0;
 	h->cap = cap;
 	h->keys = xreallocarray(NULL, cap, sizeof(h->keys[0]));
 	h->vals = xreallocarray(NULL, cap, sizeof(h->vals[0]));
-	for (i = 0; i < cap; ++i)
+	for (size_t i = 0; i < cap; ++i)
 		h->keys[i].str = NULL;
 
 	return h;
@@ -41,12 +39,10 @@ mkhtab(size_t cap)
 void
 delhtab(struct hashtable *h, void del(void *))
 {
-	size_t i;
-
 	if (!h)
 		return;
 	if (del) {
-		for (i = 0; i < h->cap; ++i) {
+		for (size_t i = 0; i < h->cap; ++i) {
 			if (h->keys[i].str)
 				del(h->vals[i]);
 		}
@@ -67,9 +63,7 @@ keyequal(struct hashtablekey *k1, struct hashtablekey *k2)
 static size_t
 keyindex(struct hashtable *h, struct hashtablekey *k)
 {
-	size_t i;
-
-	i = k->hash & (h->cap - 1);
+	size_t i = k->hash & (h->cap - 1);
 	while (h->keys[i].str && !keyequal(&h->keys[i], k))
 		i = (i + 1) & (h->cap - 1);
 	return i;
@@ -78,22 +72,18 @@ keyindex(struct hashtable *h, struct hashtablekey *k)
 void **
 htabput(struct hashtable *h, struct hashtablekey *k)
 {
-	struct hashtablekey *oldkeys;
-	void **oldvals;
-	size_t i, j, oldcap;
-
 	if (h->cap / 2 < h->len) {
-		oldkeys = h->keys;
-		oldvals = h->vals;
-		oldcap = h->cap;
+		struct hashtablekey *oldkeys = h->keys;
+		void **oldvals = h->vals;
+		const size_t oldcap = h->cap;
 		h->cap *= 2;
 		h->keys = xreallocarray(NULL, h->cap, sizeof(h->keys[0]));
 		h->vals = xreallocarray(NULL, h->cap, sizeof(h->vals[0]));
-		for (i = 0; i < h->cap; ++i)
+		for (size_t i = 0; i < h->cap; ++i)
 			h->keys[i].str = NULL;
-		for (i = 0; i < oldcap; ++i) {
+		for (size_t i = 0; i < oldcap; ++i) {
 			if (oldkeys[i].str) {
-				j = keyindex(h, &oldkeys[i]);
+				size_t j = keyindex(h, &oldkeys[i]);
 				h->keys[j] = oldkeys[i];
 				h->vals[j] = oldvals[i];
 			}
@@ -101,7 +91,7 @@ htabput(struct hashtable *h, struct hashtablekey *k)
 		free(oldkeys);
 		free(oldvals);
 	}
-	i = keyindex(h, k);
+	size_t i = keyindex(h, k);
 	if (!h->keys[i].str) {
 		h->keys[i] = *k;
 		h->vals[i] = NULL;
@@ -114,9 +104,7 @@ htabput(struct hashtable *h, struct hashtablekey *k)
 void *
 htabget(struct hashtable *h, struct hashtablekey *k)
 {
-	size_t i;
-
-	i = keyindex(h, k);
+	size_t i = keyindex(h, k);
 	return h->keys[i].str ? h->vals[i] : NULL;
 }
 
@@ -125,14 +113,15 @@ murmurhash64a(const void *ptr, size_t len)
 {
 	const uint64_t seed = 0xdecafbaddecafbadull;
 	const uint64_t m = 0xc6a4a7935bd1e995ull;
-	uint64_t h, k, n;
-	const uint8_t *p, *end;
-	int r = 47;
+	const int r = 47;
 
-	h = seed ^ (len * m);
-	n = len & ~0x7ull;
-	end = ptr;
+	uint64_t h = seed ^ (len * m);
+	const uint64_t n = len & ~0x7ull;
+	const uint8_t *end = ptr;
 	end += n;
+
+	uint64_t k;
+	const uint8_t *p;
 	for (p = ptr; p != end; p += 8) {
 		memcpy(&k, p, sizeof(k));
 
@@ -145,13 +134,20 @@ murmurhash64a(const void *ptr, size_t len)
 	}
 
 	switch (len & 0x7) {
-	case 7: h ^= (uint64_t)p[6] << 48;  /* fallthrough */
-	case 6: h ^= (uint64_t)p[5] << 40;  /* fallthrough */
-	case 5: h ^= (uint64_t)p[4] << 32;  /* fallthrough */
-	case 4: h ^= (uint64_t)p[3] << 24;  /* fallthrough */
-	case 3: h ^= (uint64_t)p[2] << 16;  /* fallthrough */
-	case 2: h ^= (uint64_t)p[1] <<  8;  /* fallthrough */
-	case 1: h ^= (uint64_t)p[0];
+	case 7:
+		h ^= (uint64_t)p[6] << 48; /* fallthrough */
+	case 6:
+		h ^= (uint64_t)p[5] << 40; /* fallthrough */
+	case 5:
+		h ^= (uint64_t)p[4] << 32; /* fallthrough */
+	case 4:
+		h ^= (uint64_t)p[3] << 24; /* fallthrough */
+	case 3:
+		h ^= (uint64_t)p[2] << 16; /* fallthrough */
+	case 2:
+		h ^= (uint64_t)p[1] << 8; /* fallthrough */
+	case 1:
+		h ^= (uint64_t)p[0];
 		h *= m;
 	}
 

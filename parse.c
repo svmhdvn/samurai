@@ -31,15 +31,13 @@ parselet(struct scanner *s, struct evalstring **val)
 static void
 parserule(struct scanner *s, struct environment *env)
 {
-	struct rule *r;
-	char *var;
-	struct evalstring *val;
 	bool hascommand = false, hasrspfile = false, hasrspcontent = false;
 
-	r = mkrule(scanname(s));
+	struct rule *r = mkrule(scanname(s));
 	scannewline(s);
 	while (scanindent(s)) {
-		var = scanname(s);
+		char *var = scanname(s);
+		struct evalstring *val;
 		parselet(s, &val);
 		ruleaddvar(r, var, val);
 		if (!val)
@@ -139,14 +137,12 @@ parseedge(struct scanner *s, struct environment *env)
 static void
 parseinclude(struct scanner *s, struct environment *env, bool newscope)
 {
-	struct evalstring *str;
-	struct string *path;
-
-	str = scanstring(s, true);
+	struct evalstring *str = scanstring(s, true);
 	if (!str)
 		scanerror(s, "expected include path");
+
 	scannewline(s);
-	path = enveval(env, str);
+	struct string *path = enveval(env, str);
 
 	if (newscope)
 		env = mkenv(env);
@@ -157,16 +153,12 @@ parseinclude(struct scanner *s, struct environment *env, bool newscope)
 static void
 parsedefault(struct scanner *s, struct environment *env)
 {
-	struct string *path;
-	struct node *n;
-	size_t i;
-
 	scanpaths(s);
 	deftarg = xreallocarray(deftarg, ndeftarg + npaths, sizeof(*deftarg));
-	for (i = 0; i < npaths; ++i) {
-		path = enveval(env, paths[i]);
+	for (size_t i = 0; i < npaths; ++i) {
+		struct string *path = enveval(env, paths[i]);
 		canonpath(path);
-		n = nodeget(path->s, path->n);
+		struct node *n = nodeget(path->s, path->n);
 		if (!n)
 			fatal("unknown target '%s'", path->s);
 		free(path);
@@ -179,18 +171,15 @@ parsedefault(struct scanner *s, struct environment *env)
 static void
 parsepool(struct scanner *s, struct environment *env)
 {
-	struct pool *p;
-	struct evalstring *val;
-	struct string *str;
-	char *var, *end;
-
-	p = mkpool(scanname(s));
+	struct pool *p = mkpool(scanname(s));
 	scannewline(s);
 	while (scanindent(s)) {
-		var = scanname(s);
+		char *var = scanname(s);
+		struct evalstring *val;
 		parselet(s, &val);
 		if (strcmp(var, "depth") == 0) {
-			str = enveval(env, val);
+			struct string *str = enveval(env, val);
+			char *end;
 			p->maxjobs = strtol(str->s, &end, 10);
 			if (*end)
 				fatal("invalid pool depth '%s'", str->s);
@@ -218,12 +207,10 @@ void
 parse(const char *name, struct environment *env)
 {
 	struct scanner s;
-	char *var;
-	struct string *val;
-	struct evalstring *str;
 
 	scaninit(&s, name);
 	for (;;) {
+		char *var;
 		switch (scankeyword(&s, &var)) {
 		case RULE:
 			parserule(&s, env);
@@ -243,13 +230,15 @@ parse(const char *name, struct environment *env)
 		case POOL:
 			parsepool(&s, env);
 			break;
-		case VARIABLE:
+		case VARIABLE: {
+			struct evalstring *str;
 			parselet(&s, &str);
-			val = enveval(env, str);
+			struct string *val = enveval(env, str);
 			if (strcmp(var, "ninja_required_version") == 0)
 				checkversion(val->s);
 			envaddvar(env, var, val);
 			break;
+		}
 		case EOF:
 			scanclose(&s);
 			return;
@@ -260,18 +249,14 @@ parse(const char *name, struct environment *env)
 void
 defaultnodes(void fn(struct node *))
 {
-	struct edge *e;
-	struct node *n;
-	size_t i;
-
 	if (ndeftarg > 0) {
-		for (i = 0; i < ndeftarg; ++i)
+		for (size_t i = 0; i < ndeftarg; ++i)
 			fn(deftarg[i]);
 	} else {
 		/* by default build all nodes which are not used by any edges */
-		for (e = alledges; e; e = e->allnext) {
-			for (i = 0; i < e->nout; ++i) {
-				n = e->out[i];
+		for (struct edge *e = alledges; e; e = e->allnext) {
+			for (size_t i = 0; i < e->nout; ++i) {
+				struct node *n = e->out[i];
 				if (n->nuse == 0)
 					fn(n);
 			}

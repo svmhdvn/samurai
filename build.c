@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #ifndef NO_GETLOADAVG
-#define _BSD_SOURCE /* for getloadavg */
+#define _DEFAULT_SOURCE /* for getloadavg */
+#define _BSD_SOURCE     /* for compatibility with glibc<2.20 */
 #endif
 #include <errno.h>
 #include <fcntl.h>
@@ -63,33 +64,26 @@ isdirty(struct node *n, struct node *newest, bool generator, bool restat)
 	if (e->rule == &phonyrule) {
 		if (e->nin > 0 || n->mtime != MTIME_MISSING)
 			return false;
-		if (buildopts.explain)
-			warn("explain %s: phony and no inputs", n->path->s);
+		EXPLAIN("%s: phony and no inputs", n->path->s);
 		return true;
 	}
 	if (n->mtime == MTIME_MISSING) {
-		if (buildopts.explain)
-			warn("explain %s: missing", n->path->s);
+		EXPLAIN("%s: missing", n->path->s);
 		return true;
 	}
 	if (isnewer(newest, n) && (!restat || n->logmtime == MTIME_MISSING)) {
-		if (buildopts.explain) {
-			warn("explain %s: older than input '%s': %" PRId64 " vs %" PRId64,
-			     n->path->s, newest->path->s, n->mtime, newest->mtime);
-		}
+		EXPLAIN("%s: older than input '%s': %" PRId64 " vs %" PRId64,
+		        n->path->s, newest->path->s, n->mtime, newest->mtime);
 		return true;
 	}
 	if (n->logmtime == MTIME_MISSING) {
 		if (!generator) {
-			if (buildopts.explain)
-				warn("explain %s: no record in .ninja_log", n->path->s);
+			EXPLAIN("%s: no record in .ninja_log", n->path->s);
 			return true;
 		}
 	} else if (newest && n->logmtime < newest->mtime) {
-		if (buildopts.explain) {
-			warn("explain %s: recorded mtime is older than input '%s': %" PRId64 " vs %" PRId64,
-			     n->path->s, newest->path->s, n->logmtime, newest->mtime);
-		}
+		EXPLAIN("%s: recorded mtime is older than input '%s': %" PRId64 " vs %" PRId64,
+		        n->path->s, newest->path->s, n->logmtime, newest->mtime);
 		return true;
 	}
 	if (generator)
@@ -97,8 +91,7 @@ isdirty(struct node *n, struct node *newest, bool generator, bool restat)
 	edgehash(e);
 	if (e->hash == n->hash)
 		return false;
-	if (buildopts.explain)
-		warn("explain %s: command line changed", n->path->s);
+	EXPLAIN("%s: command line changed", n->path->s);
 	return true;
 }
 
@@ -174,11 +167,11 @@ buildadd(struct node *n)
 	if (e->flags & FLAG_DIRTY) {
 		for (i = 0; i < e->nout; ++i) {
 			n = e->out[i];
-			if (buildopts.explain && !n->dirty) {
+			if (!n->dirty) {
 				if (e->flags & FLAG_DIRTY_IN)
-					warn("explain %s: input is dirty", n->path->s);
+					EXPLAIN("%s: input is dirty", n->path->s);
 				else if (e->flags & FLAG_DIRTY_OUT)
-					warn("explain %s: output of generating action is dirty", n->path->s);
+					EXPLAIN("%s: output of generating action is dirty", n->path->s);
 			}
 			n->dirty = true;
 		}
@@ -247,7 +240,7 @@ formatstatus(char *buf, size_t len)
 			break;
 		default:
 			fatal("unknown placeholder '%%%c' in $NINJA_STATUS", *fmt);
-			continue;  /* unreachable, but avoids warning */
+			continue; /* unreachable, but avoids warning */
 		}
 		if (n < 0)
 			fatal("snprintf:");
@@ -268,7 +261,7 @@ printstatus(struct edge *e, struct string *cmd)
 	struct string *description;
 	char status[256];
 
-	description = buildopts.verbose ? NULL : edgevar(e, "description", true);
+	description = (buildopts.flags & BUILDOPT_VERBOSE) ? NULL : edgevar(e, "description", true);
 	if (!description || description->n == 0)
 		description = cmd;
 	formatstatus(status, sizeof(status));
@@ -358,7 +351,7 @@ err2:
 	close(fd[0]);
 	close(fd[1]);
 err1:
-	if (rspfile && !buildopts.keeprsp)
+	if (rspfile && !(buildopts.flags & BUILDOPT_KEEP_RSP))
 		remove(rspfile->s);
 err0:
 	return -1;
@@ -367,11 +360,8 @@ err0:
 static void
 nodedone(struct node *n, bool prune)
 {
-	struct edge *e;
-	size_t i, j;
-
-	for (i = 0; i < n->nuse; ++i) {
-		e = n->use[i];
+	for (size_t i = 0; i < n->nuse; ++i) {
+		struct edge *e = n->use[i];
 		/* skip edges not used in this build */
 		if (!(e->flags & FLAG_WORK))
 			continue;
@@ -379,7 +369,7 @@ nodedone(struct node *n, bool prune)
 			/* either edge was clean (possible with order-only
 			 * inputs), or all its blocking inputs were pruned, so
 			 * its outputs can be pruned as well */
-			for (j = 0; j < e->nout; ++j)
+			for (size_t j = 0; j < e->nout; ++j)
 				nodedone(e->out[j], true);
 			if (e->flags & FLAG_DIRTY && e->rule != &phonyrule)
 				--ntotal;
@@ -413,27 +403,21 @@ shouldprune(struct edge *e, struct node *n, int64_t old)
 static void
 edgedone(struct edge *e)
 {
-	struct node *n;
-	size_t i;
-	struct string *rspfile;
-	bool restat;
-	int64_t old;
-
-	restat = edgevar(e, "restat", true);
-	for (i = 0; i < e->nout; ++i) {
-		n = e->out[i];
-		old = n->mtime;
+	bool restat = edgevar(e, "restat", true);
+	for (size_t i = 0; i < e->nout; ++i) {
+		struct node *n = e->out[i];
+		int64_t old = n->mtime;
 		nodestat(n);
 		n->logmtime = n->mtime == MTIME_MISSING ? 0 : n->mtime;
 		nodedone(n, restat && shouldprune(e, n, old));
 	}
-	rspfile = edgevar(e, "rspfile", false);
-	if (rspfile && !buildopts.keeprsp)
+	struct string *rspfile = edgevar(e, "rspfile", false);
+	if (rspfile && !(buildopts.flags & BUILDOPT_KEEP_RSP))
 		remove(rspfile->s);
 	edgehash(e);
 	depsrecord(e);
-	for (i = 0; i < e->nout; ++i) {
-		n = e->out[i];
+	for (size_t i = 0; i < e->nout; ++i) {
+		struct node *n = e->out[i];
 		n->hash = e->hash;
 		logrecord(n);
 	}
@@ -566,12 +550,12 @@ build(void)
 		while (work && numjobs < maxjobs && numfail < buildopts.maxfail) {
 			e = work;
 			work = work->worknext;
-			if (e->rule != &phonyrule && buildopts.dryrun) {
+			if (e->rule != &phonyrule && (buildopts.flags & BUILDOPT_DRYRUN)) {
 				++nstarted;
 				printstatus(e, edgevar(e, "command", true));
 				++nfinished;
 			}
-			if (e->rule == &phonyrule || buildopts.dryrun) {
+			if (e->rule == &phonyrule || (buildopts.flags & BUILDOPT_DRYRUN)) {
 				for (i = 0; i < e->nout; ++i)
 					nodedone(e->out[i], false);
 				continue;
@@ -627,5 +611,5 @@ build(void)
 		else
 			fatal("subcommand failed");
 	}
-	ntotal = 0;  /* reset in case we just rebuilt the manifest */
+	ntotal = 0; /* reset in case we just rebuilt the manifest */
 }

@@ -28,12 +28,10 @@ delnode(void *p)
 void
 graphinit(void)
 {
-	struct edge *e;
-
 	/* delete old nodes and edges in case we rebuilt the manifest */
 	delhtab(allnodes, delnode);
 	while (alledges) {
-		e = alledges;
+		struct edge *e = alledges;
 		alledges = e->allnext;
 		free(e->out);
 		free(e->in);
@@ -109,16 +107,15 @@ https://www.illumos.org/issues/13327
 struct string *
 nodepath(struct node *n, bool escape)
 {
-	char *s, *d;
-	int nquote;
-
 	if (!escape)
 		return n->path;
+	escape = false;
+
 	if (n->shellpath)
 		return n->shellpath;
-	escape = false;
-	nquote = 0;
-	for (s = n->path->s; *s; ++s) {
+
+	int nquote = 0;
+	for (char *s = n->path->s; *s; ++s) {
 		if (!isalnum(*(unsigned char *)s) && !strchr("_+-./", *s))
 			escape = true;
 		if (*s == '\'')
@@ -126,9 +123,9 @@ nodepath(struct node *n, bool escape)
 	}
 	if (escape) {
 		n->shellpath = mkstr(n->path->n + 2 + 3 * nquote);
-		d = n->shellpath->s;
+		char *d = n->shellpath->s;
 		*d++ = '\'';
-		for (s = n->path->s; *s; ++s) {
+		for (char *s = n->path->s; *s; ++s) {
 			*d++ = *s;
 			if (*s == '\'') {
 				*d++ = '\\';
@@ -155,9 +152,7 @@ nodeuse(struct node *n, struct edge *e)
 struct edge *
 mkedge(struct environment *parent)
 {
-	struct edge *e;
-
-	e = xmalloc(sizeof(*e));
+	struct edge *e = xmalloc(sizeof(*e));
 	e->env = mkenv(parent);
 	e->pool = NULL;
 	e->out = NULL;
@@ -174,18 +169,18 @@ mkedge(struct environment *parent)
 void
 edgehash(struct edge *e)
 {
-	static const char sep[] = ";rspfile=";
-	struct string *cmd, *rsp, *s;
-
 	if (e->flags & FLAG_HASH)
 		return;
 	e->flags |= FLAG_HASH;
-	cmd = edgevar(e, "command", true);
+
+	struct string *cmd = edgevar(e, "command", true);
 	if (!cmd)
 		fatal("rule '%s' has no command", e->rule->name);
-	rsp = edgevar(e, "rspfile_content", true);
+
+	struct string *rsp = edgevar(e, "rspfile_content", true);
 	if (rsp && rsp->n > 0) {
-		s = mkstr(cmd->n + sizeof(sep) - 1 + rsp->n);
+		static const char sep[] = ";rspfile=";
+		struct string *s = mkstr(cmd->n + sizeof(sep) - 1 + rsp->n);
 		memcpy(s->s, cmd->s, cmd->n);
 		memcpy(s->s + cmd->n, sep, sizeof(sep) - 1);
 		memcpy(s->s + cmd->n + sizeof(sep) - 1, rsp->s, rsp->n);
@@ -217,18 +212,15 @@ mkphony(struct node *n)
 void
 edgeadddeps(struct edge *e, struct node **deps, size_t ndeps)
 {
-	struct node **order, *n;
-	size_t norder, i;
-
-	for (i = 0; i < ndeps; ++i) {
-		n = deps[i];
+	for (size_t i = 0; i < ndeps; ++i) {
+		struct node *n = deps[i];
 		if (!n->gen)
 			n->gen = mkphony(n);
 		nodeuse(n, e);
 	}
 	e->in = xreallocarray(e->in, e->nin + ndeps, sizeof(e->in[0]));
-	order = e->in + e->inorderidx;
-	norder = e->nin - e->inorderidx;
+	struct node **order = e->in + e->inorderidx;
+	size_t norder = e->nin - e->inorderidx;
 	memmove(order + ndeps, order, norder * sizeof(e->in[0]));
 	memcpy(order, deps, ndeps * sizeof(e->in[0]));
 	e->inorderidx += ndeps;

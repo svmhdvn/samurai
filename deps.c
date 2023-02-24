@@ -162,7 +162,8 @@ depsinit(const char *builddir)
 			goto rewrite;
 		}
 		if (sz > cap) {
-			do cap *= 2;
+			do
+				cap *= 2;
 			while (sz > cap);
 			free(buf);
 			buf = xmalloc(cap);
@@ -373,7 +374,8 @@ depsparse(const char *name, bool allowmissing)
 			}
 			if (c == '\n') {
 				sawcolon = false;
-				do c = getc(f);
+				do
+					c = getc(f);
 				while (c == '\n');
 			}
 			if (c == EOF)
@@ -426,27 +428,25 @@ err:
 void
 depsload(struct edge *e)
 {
-	struct string *deptype, *depfile;
-	struct nodearray *deps = NULL;
-	struct node *n;
-
 	if (e->flags & FLAG_DEPS)
 		return;
 	e->flags |= FLAG_DEPS;
-	n = e->out[0];
-	deptype = edgevar(e, "deps", true);
+
+	struct nodearray *deps = NULL;
+	struct node *n = e->out[0];
+	struct string *deptype = edgevar(e, "deps", true);
 	if (deptype) {
 		if (n->id != -1 && n->mtime <= entries[n->id].mtime)
 			deps = &entries[n->id].deps;
-		else if (buildopts.explain)
-			warn("explain %s: missing or outdated record in .ninja_deps", n->path->s);
+		else
+			EXPLAIN("%s: missing or outdated record in .ninja_deps", n->path->s);
 	} else {
-		depfile = edgevar(e, "depfile", false);
+		struct string *depfile = edgevar(e, "depfile", false);
 		if (!depfile)
 			return;
 		deps = depsparse(depfile->s, false);
-		if (buildopts.explain && !deps)
-			warn("explain %s: missing or invalid depfile", n->path->s);
+		if (!deps)
+			EXPLAIN("%s: missing or invalid depfile", n->path->s);
 	}
 	if (deps) {
 		edgeadddeps(e, deps->node, deps->len);
@@ -459,46 +459,40 @@ depsload(struct edge *e)
 void
 depsrecord(struct edge *e)
 {
-	struct string *deptype, *depfile;
-	struct nodearray *deps;
-	struct node *out, *n;
-	struct entry *entry;
-	size_t i;
-	bool update;
-
-	deptype = edgevar(e, "deps", true);
+	struct string *deptype = edgevar(e, "deps", true);
 	if (!deptype || deptype->n == 0)
 		return;
 	if (strcmp(deptype->s, "gcc") != 0) {
 		warn("unsuported deps type: %s", deptype->s);
 		return;
 	}
-	depfile = edgevar(e, "depfile", false);
+
+	struct string *depfile = edgevar(e, "depfile", false);
 	if (!depfile || depfile->n == 0) {
 		warn("deps but no depfile");
 		return;
 	}
-	out = e->out[0];
-	deps = depsparse(depfile->s, true);
-	if (!buildopts.keepdepfile)
+	struct node *out = e->out[0];
+	struct nodearray *deps = depsparse(depfile->s, true);
+	if (!(buildopts.flags & BUILDOPT_KEEP_DEP_FILE))
 		remove(depfile->s);
 	if (!deps)
 		return;
-	update = false;
-	entry = NULL;
+
+	bool update = false;
 	if (recordid(out)) {
 		update = true;
 	} else {
-		entry = &entries[out->id];
+		struct entry *entry = &entries[out->id];
 		if (entry->mtime != out->mtime || entry->deps.len != deps->len)
 			update = true;
-		for (i = 0; i < deps->len && !update; ++i) {
+		for (size_t i = 0; i < deps->len && !update; ++i) {
 			if (entry->deps.node[i] != deps->node[i])
 				update = true;
 		}
 	}
-	for (i = 0; i < deps->len; ++i) {
-		n = deps->node[i];
+	for (size_t i = 0; i < deps->len; ++i) {
+		struct node *n = deps->node[i];
 		if (recordid(n))
 			update = true;
 	}

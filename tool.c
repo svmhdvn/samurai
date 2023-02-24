@@ -32,9 +32,8 @@ static int
 cleanedge(struct edge *e)
 {
 	int ret = 0;
-	size_t i;
 
-	for (i = 0; i < e->nout; ++i) {
+	for (size_t i = 0; i < e->nout; ++i) {
 		if (cleanpath(e->out[i]->path) < 0)
 			ret = -1;
 	}
@@ -49,14 +48,13 @@ cleanedge(struct edge *e)
 static int
 cleantarget(struct node *n)
 {
-	int ret = 0;
-	size_t i;
+    if (!n->gen || n->gen->rule == &phonyrule)
+        return 0;
 
-	if (!n->gen || n->gen->rule == &phonyrule)
-		return 0;
+	int ret = 0;
 	if (cleanpath(n->path) < 0)
 		ret = -1;
-	for (i = 0; i < n->gen->nin; ++i) {
+	for (size_t i = 0; i < n->gen->nin; ++i) {
 		if (cleantarget(n->gen->in[i]) < 0)
 			ret = -1;
 	}
@@ -73,7 +71,8 @@ clean(int argc, char *argv[])
 	struct node *n;
 	struct rule *r;
 
-	ARGBEGIN {
+	ARGBEGIN
+	{
 	case 'g':
 		cleangen = true;
 		break;
@@ -83,7 +82,8 @@ clean(int argc, char *argv[])
 	default:
 		fprintf(stderr, "usage: %s ... -t clean [-gr] [targets...]\n", argv0);
 		return 2;
-	} ARGEND
+	}
+	ARGEND
 
 	if (cleanrule) {
 		if (!argc)
@@ -148,11 +148,9 @@ targetcommands(struct node *n)
 static int
 commands(int argc, char *argv[])
 {
-	struct node *n;
-
 	if (argc > 1) {
 		while (*++argv) {
-			n = nodeget(*argv, 0);
+                    struct node *n = nodeget(*argv, 0);
 			if (!n)
 				fatal("unknown target '%s'", *argv);
 			targetcommands(n);
@@ -170,11 +168,8 @@ commands(int argc, char *argv[])
 static void
 printjson(const char *s, size_t n, bool join)
 {
-	size_t i;
-	char c;
-
-	for (i = 0; i < n; ++i) {
-		c = s[i];
+	for (size_t i = 0; i < n; ++i) {
+		char c = s[i];
 		switch (c) {
 		case '"':
 		case '\\':
@@ -201,14 +196,16 @@ compdb(int argc, char *argv[])
 	int i;
 	size_t off;
 
-	ARGBEGIN {
+	ARGBEGIN
+	{
 	case 'x':
 		expandrsp = true;
 		break;
 	default:
 		fprintf(stderr, "usage: %s ... -t compdb [-x] [rules...]\n", argv0);
 		return 2;
-	} ARGEND
+	}
+	ARGEND
 
 	if (!getcwd(dir, sizeof(dir)))
 		fatal("getcwd:");
@@ -293,8 +290,6 @@ graphnode(struct node *n)
 static int
 graph(int argc, char *argv[])
 {
-	struct node *n;
-
 	puts("digraph ninja {");
 	puts("rankdir=\"LR\"");
 	puts("node [fontsize=10, shape=box, height=0.25]");
@@ -302,7 +297,7 @@ graph(int argc, char *argv[])
 
 	if (argc > 1) {
 		while (*++argv) {
-			n = nodeget(*argv, 0);
+			struct node *n = nodeget(*argv, 0);
 			if (!n)
 				fatal("unknown target '%s'", *argv);
 			graphnode(n);
@@ -322,32 +317,26 @@ graph(int argc, char *argv[])
 static int
 query(int argc, char *argv[])
 {
-	struct node *n;
-	struct edge *e;
-	char *path;
-	int i;
-	size_t j, k;
-
 	if (argc == 1) {
 		fprintf(stderr, "usage: %s ... -t query target...\n", argv0);
 		exit(2);
 	}
-	for (i = 1; i < argc; ++i) {
-		path = argv[i];
-		n = nodeget(path, 0);
+	for (size_t i = 1; i < argc; ++i) {
+	        char *path = argv[i];
+		struct node *n = nodeget(path, 0);
 		if (!n)
 			fatal("unknown target '%s'", path);
 		printf("%s:\n", argv[i]);
-		e = n->gen;
+		struct edge *e = n->gen;
 		if (e) {
 			printf("  input: %s\n", e->rule->name);
-			for (j = 0; j < e->nin; ++j)
+			for (size_t j = 0; j < e->nin; ++j)
 				printf("    %s\n", e->in[j]->path->s);
 		}
 		puts("  outputs:");
-		for (j = 0; j < n->nuse; ++j) {
+		for (size_t j = 0; j < n->nuse; ++j) {
 			e = n->use[j];
-			for (k = 0; k < e->nout; ++k)
+			for (size_t k = 0; k < e->nout; ++k)
 				printf("    %s\n", e->out[k]->path->s);
 		}
 	}
@@ -358,11 +347,10 @@ query(int argc, char *argv[])
 static void
 targetsdepth(struct node *n, size_t depth, size_t indent)
 {
-	struct edge *e = n->gen;
-	size_t i;
-
-	for (i = 0; i < indent; ++i)
+	for (size_t i = 0; i < indent; ++i)
 		printf("  ");
+
+        struct edge *e = n->gen;
 	if (e) {
 		printf("%s: %s\n", n->path->s, e->rule->name);
 		if (depth != 1) {
@@ -388,12 +376,12 @@ targetsusage(void)
 static int
 targets(int argc, char *argv[])
 {
-	struct edge *e;
-	size_t depth = 1, i;
+    if (argc > 3)
+        targetsusage();
+
+	size_t depth = 1;
 	char *end, *mode, *name;
 
-	if (argc > 3)
-		targetsusage();
 	mode = argv[1];
 	if (!mode || strcmp(mode, "depth") == 0) {
 		if (argc == 3) {
@@ -401,28 +389,28 @@ targets(int argc, char *argv[])
 			if (*end)
 				targetsusage();
 		}
-		for (e = alledges; e; e = e->allnext) {
-			for (i = 0; i < e->nout; ++i) {
+		for (struct edge *e = alledges; e; e = e->allnext) {
+			for (size_t i = 0; i < e->nout; ++i) {
 				if (e->out[i]->nuse == 0)
 					targetsdepth(e->out[i], depth, 0);
 			}
 		}
 	} else if (strcmp(mode, "rule") == 0) {
 		name = argv[2];
-		for (e = alledges; e; e = e->allnext) {
+		for (struct edge *e = alledges; e; e = e->allnext) {
 			if (!name) {
-				for (i = 0; i < e->nin; ++i) {
+				for (size_t i = 0; i < e->nin; ++i) {
 					if (!e->in[i]->gen)
 						puts(e->in[i]->path->s);
 				}
 			} else if (strcmp(e->rule->name, name) == 0) {
-				for (i = 0; i < e->nout; ++i)
+				for (size_t i = 0; i < e->nout; ++i)
 					puts(e->out[i]->path->s);
 			}
 		}
 	} else if (strcmp(mode, "all") == 0 && argc == 2) {
-		for (e = alledges; e; e = e->allnext) {
-			for (i = 0; i < e->nout; ++i)
+		for (struct edge *e = alledges; e; e = e->allnext) {
+			for (size_t i = 0; i < e->nout; ++i)
 				printf("%s: %s\n", e->out[i]->path->s, e->rule->name);
 		}
 	} else {
@@ -436,12 +424,12 @@ targets(int argc, char *argv[])
 }
 
 static const struct tool tools[] = {
-	{"clean", clean},
-	{"commands", commands},
-	{"compdb", compdb},
-	{"graph", graph},
-	{"query", query},
-	{"targets", targets},
+    {"clean", clean},
+    {"commands", commands},
+    {"compdb", compdb},
+    {"graph", graph},
+    {"query", query},
+    {"targets", targets},
 };
 
 const struct tool *

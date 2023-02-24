@@ -1,4 +1,4 @@
-#include <stdint.h>  /* for uint64_t */
+#include <stdint.h> /* for uint64_t */
 
 /* set in the tv_nsec field of a node's mtime */
 enum {
@@ -52,20 +52,20 @@ struct edge {
 	/* how many inputs need to be pruned before all outputs can be pruned */
 	size_t nprune;
 
-	enum {
-		FLAG_WORK      = 1 << 0,  /* scheduled for build */
-		FLAG_HASH      = 1 << 1,  /* calculated the command hash */
-		FLAG_DIRTY_IN  = 1 << 3,  /* dirty input */
-		FLAG_DIRTY_OUT = 1 << 4,  /* missing or outdated output */
-		FLAG_DIRTY     = FLAG_DIRTY_IN | FLAG_DIRTY_OUT,
-		FLAG_CYCLE     = 1 << 5,  /* used for cycle detection */
-		FLAG_DEPS      = 1 << 6,  /* dependencies loaded */
-	} flags;
-
 	/* used to coordinate ready work in build() */
 	struct edge *worknext;
 	/* used for alledges linked list */
 	struct edge *allnext;
+
+	enum {
+		FLAG_WORK = 1 << 0,      /* scheduled for build */
+		FLAG_HASH = 1 << 1,      /* calculated the command hash */
+		FLAG_DIRTY_IN = 1 << 3,  /* dirty input */
+		FLAG_DIRTY_OUT = 1 << 4, /* missing or outdated output */
+		FLAG_DIRTY = FLAG_DIRTY_IN | FLAG_DIRTY_OUT,
+		FLAG_CYCLE = 1 << 5, /* used for cycle detection */
+		FLAG_DEPS = 1 << 6,  /* dependencies loaded */
+	} flags;
 };
 
 void graphinit(void);

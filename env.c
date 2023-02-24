@@ -72,10 +72,8 @@ mkenv(struct environment *parent)
 struct string *
 envvar(struct environment *env, char *var)
 {
-	struct treenode *n;
-
 	do {
-		n = treefind(env->bindings, var);
+		struct treenode *n = treefind(env->bindings, var);
 		if (n)
 			return n->value;
 		env = env->parent;
@@ -140,10 +138,8 @@ envaddrule(struct environment *env, struct rule *r)
 struct rule *
 envrule(struct environment *env, char *name)
 {
-	struct treenode *n;
-
 	do {
-		n = treefind(env->rules, name);
+		struct treenode *n = treefind(env->rules, name);
 		if (n)
 			return n->value;
 		env = env->parent;
@@ -155,20 +151,19 @@ envrule(struct environment *env, char *name)
 static struct string *
 pathlist(struct node **nodes, size_t n, char sep, bool escape)
 {
-	size_t i, len;
-	struct string *path, *result;
-	char *s;
-
 	if (n == 0)
 		return NULL;
 	if (n == 1)
 		return nodepath(nodes[0], escape);
-	for (i = 0, len = 0; i < n; ++i)
+
+	size_t len = 0;
+	for (size_t i = 0; i < n; ++i)
 		len += nodepath(nodes[i], escape)->n;
-	result = mkstr(len + n - 1);
-	s = result->s;
-	for (i = 0; i < n; ++i) {
-		path = nodepath(nodes[i], escape);
+
+	struct string *result = mkstr(len + n - 1);
+	char *s = result->s;
+	for (size_t i = 0; i < n; ++i) {
+		struct string *path = nodepath(nodes[i], escape);
 		memcpy(s, path->s, path->n);
 		s += path->n;
 		*s++ = sep;
@@ -181,12 +176,9 @@ pathlist(struct node **nodes, size_t n, char sep, bool escape)
 struct rule *
 mkrule(char *name)
 {
-	struct rule *r;
-
-	r = xmalloc(sizeof(*r));
+	struct rule *r = xmalloc(sizeof(*r));
 	r->name = name;
 	r->bindings = NULL;
-
 	return r;
 }
 
@@ -212,9 +204,6 @@ struct string *
 edgevar(struct edge *e, char *var, bool escape)
 {
 	static void *const cycle = (void *)&cycle;
-	struct evalstring *str, *p;
-	struct treenode *n;
-	size_t len;
 
 	if (strcmp(var, "in") == 0)
 		return pathlist(e->in, e->inimpidx, ' ', escape);
@@ -222,18 +211,21 @@ edgevar(struct edge *e, char *var, bool escape)
 		return pathlist(e->in, e->inimpidx, '\n', escape);
 	if (strcmp(var, "out") == 0)
 		return pathlist(e->out, e->outimpidx, ' ', escape);
-	n = treefind(e->env->bindings, var);
+
+	struct treenode *n = treefind(e->env->bindings, var);
 	if (n)
 		return n->value;
+
 	n = treefind(e->rule->bindings, var);
 	if (!n)
 		return envvar(e->env->parent, var);
 	if (n->value == cycle)
 		fatal("cycle in rule variable involving '%s'", var);
-	str = n->value;
+
+	struct evalstring *str = n->value;
 	n->value = cycle;
-	len = 0;
-	for (p = str; p; p = p->next) {
+	size_t len = 0;
+	for (struct evalstring *p = str; p; p = p->next) {
 		if (p->var)
 			p->str = edgevar(e, p->var, escape);
 		if (p->str)
@@ -279,9 +271,7 @@ delpool(void *ptr)
 struct pool *
 poolget(char *name)
 {
-	struct treenode *n;
-
-	n = treefind(pools, name);
+	struct treenode *n = treefind(pools, name);
 	if (!n)
 		fatal("unknown pool '%s'", name);
 

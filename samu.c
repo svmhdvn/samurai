@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>  /* for chdir */
+#include <unistd.h> /* for chdir */
 #include "arg.h"
 #include "build.h"
 #include "deps.h"
@@ -27,9 +27,7 @@ usage(void)
 static char *
 getbuilddir(void)
 {
-	struct string *builddir;
-
-	builddir = envvar(rootenv, "builddir");
+	struct string *builddir = envvar(rootenv, "builddir");
 	if (!builddir)
 		return NULL;
 	if (makedirs(builddir, false) < 0)
@@ -41,11 +39,11 @@ static void
 debugflag(const char *flag)
 {
 	if (strcmp(flag, "explain") == 0)
-		buildopts.explain = true;
+		buildopts.flags |= BUILDOPT_EXPLAIN;
 	else if (strcmp(flag, "keepdepfile") == 0)
-		buildopts.keepdepfile = true;
+		buildopts.flags |= BUILDOPT_KEEP_DEP_FILE;
 	else if (strcmp(flag, "keeprsp") == 0)
-		buildopts.keeprsp = true;
+		buildopts.flags |= BUILDOPT_KEEP_RSP;
 	else
 		fatal("unknown debug flag '%s'", flag);
 }
@@ -93,15 +91,15 @@ jobsflag(const char *flag)
 static void
 parseenvargs(char *env)
 {
-	char *arg, *argvbuf[64], **argv = argvbuf;
-	int argc;
-
 	if (!env)
 		return;
+
+	char *argvbuf[64], **argv = argvbuf;
+
 	env = xmemdup(env, strlen(env) + 1);
-	argc = 1;
+	int argc = 1;
 	argv[0] = NULL;
-	arg = strtok(env, " ");
+	char *arg = strtok(env, " ");
 	while (arg) {
 		if ((size_t)argc >= LEN(argvbuf) - 1)
 			fatal("too many arguments in SAMUFLAGS");
@@ -110,19 +108,21 @@ parseenvargs(char *env)
 	}
 	argv[argc] = NULL;
 
-	ARGBEGIN {
+	ARGBEGIN
+	{
 	case 'j':
 		jobsflag(EARGF(usage()));
 		break;
 	case 'v':
-		buildopts.verbose = true;
+		buildopts.flags |= BUILDOPT_VERBOSE;
 		break;
 	case 'l':
 		loadflag(EARGF(usage()));
 		break;
 	default:
 		fatal("invalid option in SAMUFLAGS");
-	} ARGEND
+	}
+	ARGEND
 
 	free(env);
 }
@@ -130,11 +130,10 @@ parseenvargs(char *env)
 static const char *
 progname(const char *arg, const char *def)
 {
-	const char *slash;
-
 	if (!arg)
 		return def;
-	slash = strrchr(arg, '/');
+
+	const char *slash = strrchr(arg, '/');
 	return slash ? slash + 1 : arg;
 }
 
@@ -149,14 +148,15 @@ main(int argc, char *argv[])
 
 	argv0 = progname(argv[0], "samu");
 	parseenvargs(getenv("SAMUFLAGS"));
-	ARGBEGIN {
+	ARGBEGIN
+	{
 	case '-':
 		arg = EARGF(usage());
 		if (strcmp(arg, "version") == 0) {
 			printf("%d.%d.0\n", ninjamajor, ninjaminor);
 			return 0;
 		} else if (strcmp(arg, "verbose") == 0) {
-			buildopts.verbose = true;
+			buildopts.flags |= BUILDOPT_VERBOSE;
 		} else {
 			usage();
 		}
@@ -186,26 +186,29 @@ main(int argc, char *argv[])
 		loadflag(EARGF(usage()));
 		break;
 	case 'n':
-		buildopts.dryrun = true;
+		buildopts.flags |= BUILDOPT_DRYRUN;
 		break;
 	case 't':
 		tool = toolget(EARGF(usage()));
 		goto argdone;
 	case 'v':
-		buildopts.verbose = true;
+		buildopts.flags |= BUILDOPT_VERBOSE;
 		break;
 	case 'w':
 		warnflag(EARGF(usage()));
 		break;
 	default:
 		usage();
-	} ARGEND
+	}
+	ARGEND
 argdone:
 	if (!buildopts.maxjobs) {
 #ifdef _SC_NPROCESSORS_ONLN
 		int n = sysconf(_SC_NPROCESSORS_ONLN);
 		switch (n) {
-		case -1: case 0: case 1:
+		case -1:
+		case 0:
+		case 1:
 			buildopts.maxjobs = 2;
 			break;
 		case 2:
@@ -253,7 +256,7 @@ retry:
 			if (n->gen->flags & FLAG_DIRTY_OUT || n->gen->nprune > 0) {
 				if (++tries > 100)
 					fatal("manifest '%s' dirty after 100 tries", manifest);
-				if (!buildopts.dryrun)
+				if (!(buildopts.flags & BUILDOPT_DRYRUN))
 					goto retry;
 			}
 			/* manifest was pruned; reset state, then continue with build */

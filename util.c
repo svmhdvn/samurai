@@ -48,12 +48,9 @@ fatal(const char *fmt, ...)
 void *
 xmalloc(size_t n)
 {
-	void *p;
-
-	p = malloc(n);
+	void *p = malloc(n);
 	if (!p)
 		fatal("malloc:");
-
 	return p;
 }
 
@@ -173,7 +170,8 @@ canonpath(struct string *path)
 			continue;
 		case '.':
 			switch (s[1]) {
-			case '\0': case '/':
+			case '\0':
+			case '/':
 				s += 2;
 				continue;
 			case '.':

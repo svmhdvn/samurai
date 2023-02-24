@@ -1,10 +1,26 @@
+#ifndef _BUILD_H_
+#define _BUILD_H_
+
+#define EXPLAIN(fmt, ...) \
+	do { \
+		if (buildopts.flags & BUILDOPT_EXPLAIN) { \
+			warn("explain " fmt, __VA_ARGS__); \
+		} \
+	} while (0)
+
 struct node;
 
 struct buildoptions {
-	size_t maxjobs, maxfail;
-	_Bool verbose, explain, keepdepfile, keeprsp, dryrun;
 	const char *statusfmt;
+	size_t maxjobs, maxfail;
 	double maxload;
+	enum {
+		BUILDOPT_VERBOSE = 1 << 0,
+		BUILDOPT_EXPLAIN = 1 << 1,
+		BUILDOPT_KEEP_DEP_FILE = 1 << 2,
+		BUILDOPT_KEEP_RSP = 1 << 3,
+		BUILDOPT_DRYRUN = 1 << 4,
+	} flags;
 };
 
 extern struct buildoptions buildopts;
@@ -15,3 +31,5 @@ void buildreset(void);
 void buildadd(struct node *);
 /* execute rules to build the scheduled targets */
 void build(void);
+
+#endif
